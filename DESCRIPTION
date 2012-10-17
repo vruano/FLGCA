@@ -1,0 +1,11 @@
+Package: FLGCA
+Type: Package
+Title: Fragment Length and GC bias Analysis
+Version: 1.0
+Date: 2012-09-20
+Author: Valentin Ruano-Rubio <valentin.ruano@gmail.com>
+Maintainer: Valentin Ruano-Rubio <valentin.ruano@gmail.com>
+Description: Provides method use to perform Fragment-length and GC bias analysis. This package is customized to the requirements of MalariaGEN in the analysis P.falciparum data.
+Depends: R (>= 2.14.1), mclust (>= 4.0), IRanges (>= 1.12.6), ggplot2 (>= 0.9.1), MASS (>= 7.3), rtracklayer (>= 1.14.4), bitops (>= 1.0), Biostrings (>= 2.22), lineRatio (>= 0.1)
+Suggests: GCcorrect
+License: GPL-3

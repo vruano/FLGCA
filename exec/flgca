@@ -1,0 +1,154 @@
+#!/usr/bin/env Rscript 
+
+#options(error=utils::recover);
+
+require("optparse",quietly=T);
+options.spec = list(
+  make_option(c("-fl","--fragmentList"),type="character",
+            help="name of the gzip file with the list of fragments"),
+  make_option(c("-o","--output",type="character",
+            help="output directory")),
+  make_option(c("-c","--compressed",type="logical",default=NULL)),
+  make_option(c("--downSample",type="integer",default=NULL)),
+  make_option(c("-R","--reference",type="character",default=NULL)),
+  make_option(c("-M","--mask",type="character"),default=NULL),
+  make_option(c("-L","--intervals",type="character",default=NULL)),
+  make_option(c("--simulationCount", type="integer",default=NULL)),
+  make_option(c("--simulationExcludeMasked", type="logical",default=T)),
+  make_option(c("-A","--annotation"), type="character",default=character(0)),
+  make_option(c("--sample"), type="character",default=NULL),
+  make_option(c("--correct"), type="logical",default=F),
+  make_option(c("--biasAnalysis"), type="logical",default=T),
+  make_option(c("--binSize"), type="integer",default=1000),
+  make_option(c("--binMinMappability", type="numeric",default=0.4))
+);
+
+options.parser = OptionParser(usage="usage: %prog [options]", option_list = options.spec,add_help_option = TRUE);
+command.args = commandArgs(trailingOnly=T);
+if (length(command.args) == 0) {
+  print_help(options.parser);
+  quit(save="no");
+}
+
+#command.args = c(
+#  "--sample","PG0051-C",
+#  "--downSample","10000",
+#  "--simulationCount","10000",
+#  "--fragmentList","/data/haldane/malariagen/pfalciparum/crosses/bam-files/PG0051-C.flext.tsv.gz","--reference","/data/haldane/malariagen/pfalciparum/reference/3D7_pm.2bit","--mask","/data/haldane/malariagen/pfalciparum/reference/3D7_pm.mappability.MQ10L76.2bit","--intervals","/data/haldane/malariagen/pfalciparum/reference/3D7_pm.nuclear.bed","--output","/tmp/234","--correct","F","--biasAnalysis","T");
+options = parse_args(options.parser,args=command.args);
+
+
+if (is.null(options$sample)) {
+  warning("no sample name specified");
+}
+
+sampleName = options$sample;
+
+
+require("FLGCA",quietly=T);
+
+outDir = options$output;
+fragmentListFile = options$fragmentList;
+downSample = options$downSample;
+fragmentListFile.compressed = options$compressed;
+referenceFile = options$reference;
+referenceMaskFile = if (!is.null(options$referenceMask)) options$referenceMask else referenceFile;
+intervalsFile = options$intervals;
+simulationCount = options$simulationCount;
+doBiasAnalysis = options$biasAnalysis;
+correct = options$correct;
+binSize = options$binSize;
+binMinMappability = options$binMinMappability;
+excludeMasked = if (is.null(options$simulationExcludeMasked)) TRUE else options$simulationExcludeMasked;
+
+if (is.null(fragmentListFile)) {
+  write("you need to specify a fragment list file (--fragmentFile FILE)",stderr());
+  quit(save="no");
+}
+if (is.null(referenceFile)) {
+  write("you need to specify a reference 2bit formated file (--reference FILE)",stderr());
+  quit(save="no");
+}
+if (is.null(outDir)) {
+  write("you need to specify an output directory name (--output DIR)",stderr());
+  quit(save="no");
+}
+
+if (!file.exists(fragmentListFile)) stop("fragment list file name provided does not exists");
+if (!dir.create(outDir,showWarnings=F) & !file.exists(paste(outDir,".",sep="/"))) stop("error creating output directory");
+
+if (is.null(fragmentListFile.compressed)) fragmentListFile.compressed = length(grep("\\.gz$",fragmentListFile)) > 0; 
+if (fragmentListFile.compressed) {
+  fragmentListFile.conn = gzfile(fragmentListFile);
+} else {
+  fragmentListFile.conn = file(fragmentListFile);
+}
+
+if (!file.exists(referenceFile)) stop("reference file provided does not exists");
+if (!is.null(intervalsFile) & !file.exists(intervalsFile)) stop("intervals file provided does not exists");
+  
+if (!is.null(simulationCount) && simulationCount <= 0) stop("the simulation count cannot be less than 1");  
+
+
+reference.2bit = TwoBitFile(referenceFile);
+reference = import.2bit(reference.2bit);
+reference.seqinfo = seqinfo(reference);
+referenceMask.2bit = TwoBitFile(referenceMaskFile);
+referenceMask = import.2bit(referenceMask.2bit);
+referenceMask.N = sapply(strsplit(as.character(referenceMask),""), function(x) { x == "N" });
+reference.GC = sapply(strsplit(as.character(reference),""), function(x) { x == "G" | x == "C" });
+
+reference.seqtable = as.data.frame(reference.seqinfo);
+reference.range.list = IRangesList(sapply(row.names(reference.seqtable),USE.NAMES=T, function(seqname) {
+  seqlength = reference.seqtable[seqname,]$seqlengths;
+  IRanges(start=1,end=seqlength,width=seqlength);
+}));
+
+if (!is.null(intervalsFile)) {
+  input.range.list = ranges(import.bed(intervalsFile));
+  range.list = IRangesList(sapply(names(input.range.list),USE.NAMES=T, function(name) {
+      ref_homolog = reference.range.list[[name]];
+      if (is.null(ref_homolog)) stop("input range is not in reference");
+      intersect(input.range.list[[name]],ref_homolog);
+  }));
+} else {
+   range.list = reference.range.list;
+}
+
+range.list.total.width = sum(sapply(range.list,simplify=T, function(x) { width(x)}));
+annotation = RangedData();
+
+dummy__ = sapply(options$annotation,function(x) {
+  if (!file.exists(x)) {
+    print(x);
+    
+    write(paste("annotation file ",x," does not exists or cannot be reached",sep=""));
+    quit(save="no");
+  }
+  anno_ = import.gff(x);
+  annotation = rbind(anno_);
+});
+
+if (!is.null(sampleName)) {
+  #annotation = subset(annotation,subset= Sample == sampleName);
+} else {
+  sampleName = "";
+}
+
+#### Actual work ###
+
+
+
+results = fragmentListAnalyse("TEST",fragmentListFile=fragmentListFile.conn,downSample=downSample);
+if (is.null(simulationCount)) simulationCount = nrow(results$data);
+
+if (doBiasAnalysis) {
+  writeFragmentListResults(results,outDir=outDir,sampleName=sampleName);
+  simulation = referenceSimulation(results,as.integer(simulationCount),excludeMasked=excludeMasked);
+  biasData = biasAnalysis(results,simulation,excludeMasked=excludeMasked);
+  writeBiasResults(biasData,outDir=outDir,sampleName=sampleName);
+}
+
+if (correct) {
+  gcCorrection(results,bin.size=binSize,outDir=outDir);
+}
