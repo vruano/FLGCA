@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript 
 
+
 #options(error=utils::recover);
 
 require("optparse",quietly=T);
@@ -25,16 +26,19 @@ options.spec = list(
 
 options.parser = OptionParser(usage="usage: %prog [options]", option_list = options.spec,add_help_option = TRUE);
 command.args = commandArgs(trailingOnly=T);
-if (length(command.args) == 0) {
+if (length(command.args) < 0) {
   print_help(options.parser);
   quit(save="no");
 }
+
+#command.args = strsplit("--intervals /data/malariagen2/plasmodium/pf-crosses/data/genome/sanger/version3/September_2012/Pf3D7_v3.fa.bed --sample ERR019068 --downSample 10000 --simulationCount 10000 --fragmentList /data/malariagen2/plasmodium/pf-crosses/data/3d7_v3/bwa_default/gc_analysis/ERR019068.frag-list.gz --reference /data/malariagen2/plasmodium/pf-crosses/data/genome/sanger/version3/September_2012/Pf3D7_v3.2bit --output /home/valentin/ERR019068.flgca --correct F --biasAnalysis T"," ")[[1]];
 
 #command.args = c(
 #  "--sample","PG0051-C",
 #  "--downSample","10000",
 #  "--simulationCount","10000",
 #  "--fragmentList","/data/haldane/malariagen/pfalciparum/crosses/bam-files/PG0051-C.flext.tsv.gz","--reference","/data/haldane/malariagen/pfalciparum/reference/3D7_pm.2bit","--mask","/data/haldane/malariagen/pfalciparum/reference/3D7_pm.mappability.MQ10L76.2bit","--intervals","/data/haldane/malariagen/pfalciparum/reference/3D7_pm.nuclear.bed","--output","/tmp/234","--correct","F","--biasAnalysis","T");
+
 options = parse_args(options.parser,args=command.args);
 
 
@@ -85,9 +89,9 @@ if (fragmentListFile.compressed) {
 }
 
 if (!file.exists(referenceFile)) stop("reference file provided does not exists");
-if (!is.null(intervalsFile) & !file.exists(intervalsFile)) stop("intervals file provided does not exists");
+if (!is.null(intervalsFile)) if (!file.exists(intervalsFile)) stop("intervals file provided does not exists");
   
-if (!is.null(simulationCount) && simulationCount <= 0) stop("the simulation count cannot be less than 1");  
+if (!is.null(simulationCount) & simulationCount <= 0) stop("the simulation count cannot be less than 1");  
 
 
 reference.2bit = TwoBitFile(referenceFile);
@@ -141,6 +145,7 @@ if (!is.null(sampleName)) {
 
 results = fragmentListAnalyse("TEST",fragmentListFile=fragmentListFile.conn,downSample=downSample);
 if (is.null(simulationCount)) simulationCount = nrow(results$data);
+if (simulationCount > nrow(results$data)) simulationCount = nrow(results$data);
 
 if (doBiasAnalysis) {
   writeFragmentListResults(results,outDir=outDir,sampleName=sampleName);

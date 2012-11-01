@@ -45,7 +45,7 @@ fragmentListAnalyse = function(sampleName,fragmentListFile,qlim=c(0.25,0.75),dow
   cat("Fragments size mixture model fit... ",file=stderr()); flush(stderr());
   
   if (is.null(downSample)) downSample = min(nrow(fl),10000); 
-  lengthsSample = if (nrow(fl) <= downSample) fl$LENGTH else sample(fl$LENGTH,downSample,replace=F);
+  lengthsSample = if (nrow(fl) <= downSample) fl$LENGTH else sample(fl$LENGTH,downSample,replace=T);
     
   gaussFit = fragmentListFitGaussian(lengthsSample);
   cat("done\n",file=stderr()); flush(stderr());
@@ -139,7 +139,7 @@ writeFragmentListResults = function(analysis,outDir,hist.binwidth=2,hist.sigma=4
 
 referenceSimulation = function(results,simulationCount,excludeMasked=T) {  
 
-  ref.simulation.length = if (simulationCount == nrow(results$data)) results$data$LENGTH else sample(results$data$LENGTH,simulationCount);
+  ref.simulation.length = if (simulationCount == nrow(results$data)) results$data$LENGTH else sample(results$data$LENGTH,simulationCount,replace=T);
   ref.simulation.read.length = ceiling(mean(c(results$data$N.FIRST,results$data$N.LAST),na.rm=T));
   ref.simulation.strand = runif(simulationCount) < 0.5;
   ref.simulation.reads.gccount = integer(simulationCount);
@@ -151,7 +151,7 @@ referenceSimulation = function(results,simulationCount,excludeMasked=T) {
   ref.simulation.first.nucscount = integer(simulationCount);
   ref.simulation.last.nucscount = integer(simulationCount);
   
-  range.widths = sapply(range.list,simplify=T, function(x) { as.integer(width(x))});
+  range.widths = sapply(1:length(range.list),simplify=T, function(x) { as.integer(width(range.list[x]))});
 
   sc.pc = ceiling(simulationCount / 100);
   cat(paste("Performing reference simulation... (",simulationCount," repeats) ",sep=""),file=stderr()); flush(stderr());
